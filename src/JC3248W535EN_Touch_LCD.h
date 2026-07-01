@@ -4,6 +4,8 @@
  *  See: https://github.com/AudunKodehode/JC3248W535EN-Touch-LCD
  */
 
+//#define USE_TOUCHSCREEN_FUDGE_FACTOR		//the touchscreen doent appear to cover the whole panel
+
 #ifndef JC3248W535EN_TOUCH_LCD_H
 #define JC3248W535EN_TOUCH_LCD_H
 
@@ -16,6 +18,16 @@ public:
     JC3248W535EN();
     bool begin();
     
+	uint16_t width = 480;	//screen width
+	uint16_t height = 320;	//screen height
+
+	volatile static bool screenWasTouched;		//when touch interrupt hits this changes to 1. Service in main .ino and reset to 0 after done
+	static unsigned long nextTouchScreenCheck;	//only allow interrupt to change after this time in millis
+	
+	//may be better to store last touch variables here?
+	uint16_t xT;
+	uint16_t yT;
+	
     // Color functions
     uint16_t rgb(uint8_t r, uint8_t g, uint8_t b);
     void setColor(uint8_t r, uint8_t g, uint8_t b);
@@ -55,16 +67,20 @@ public:
     uint16_t mapX(uint16_t x, uint16_t y);
     uint16_t mapY(uint16_t x, uint16_t y);
     
-    // Touch function
-    bool getTouchPoint(uint16_t &x, uint16_t &y);
-    
+    // Touch function returns x and y values back to calling function. 
+	//Prob want to use internal xT, yT variables here?
+    bool getTouchPoint(uint16_t &x, uint16_t &y);	//get the touchpoint that was touched
+	void clearTouchData(void);		//try to clear any touch interrupts
+	static void IRAM_ATTR touchISR_Lib(void);	//touch interrupt function
+	
     // Make gfx accessible for direct pixel manipulation
-    Arduino_Canvas* gfx;
+    Arduino_Canvas* gfx;			//this is the buffered version
+	//Arduino_GFX *gfx;				//this appears to act the exact same should allow for other example code to be used?
     
 private:
     Arduino_ESP32QSPI* bus;
     Arduino_AXS15231B* g;
-    
+	
     uint8_t currentR, currentG, currentB;
     uint16_t currentColor;
 };

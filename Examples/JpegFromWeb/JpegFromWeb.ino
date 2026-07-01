@@ -3,6 +3,17 @@
 #include <JC3248W535EN-Touch-LCD.h>
 #include <SPIFFS.h>
 
+//Need to install these libraries 1st
+//Verified with v1.6.5 GFX Library for Arduino / Arduino_GFX_Library.h 
+//https://github.com/moononournation/Arduino_GFX
+//https://github.com/Bodmer/JPEGDecoder
+
+//And then install this JC3248W535EN-Touch-LCD library manually in Arduino by adding zip libarary.
+//I tested with the 0.9.6 version
+//https://github.com/AudunKodehode/JC3248W535EN-Touch-LCD/releases/tag/0.9.6
+
+//Have to use screen.flush() for anything to change on the display.
+
 JC3248W535EN screen;
 
 // WiFi credentials

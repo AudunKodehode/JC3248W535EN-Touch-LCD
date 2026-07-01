@@ -17,19 +17,30 @@
 #define TOUCH_SDA 4
 #define TOUCH_SCL 8
 #define TOUCH_I2C_CLOCK 400000
-#define TOUCH_RST_PIN 12
-#define TOUCH_INT_PIN 11
+//#define TOUCH_RST_PIN 12		//Dont think this is 12 or exists. Pin 12 is the SD_MMC_CLK pin
+#define TOUCH_PIN_NUM_INT 3			//Touch interrupt pin is I03/3 called TP_INT on guition schematic. This is not GPIO 11!
 #define AXS_MAX_TOUCH_NUMBER 1
+
+// You must define these static members in the .cpp file
+volatile bool JC3248W535EN::screenWasTouched = false;
+unsigned long JC3248W535EN::nextTouchScreenCheck = 0;
 
 JC3248W535EN::JC3248W535EN() {
     bus = new Arduino_ESP32QSPI(45, 47, 21, 48, 40, 39);
-    g = new Arduino_AXS15231B(bus, GFX_NOT_DEFINED, 0, false, 320, 480);
-    gfx = new Arduino_Canvas(320, 480, g, 0, 0, 0);
+	g = new Arduino_AXS15231B(bus, GFX_NOT_DEFINED, 0, false, 320, width);
+    gfx = new Arduino_Canvas(height, width, g, 0, 0, 0);
     currentR = currentG = currentB = 255;
     currentColor = 0xFFFF;
 }
 
+void IRAM_ATTR JC3248W535EN::touchISR_Lib(void) {
+  if (millis() < nextTouchScreenCheck ){ return; }    //dont let an interrupt happen unless we have it armed. This is prob un-needed
+  screenWasTouched = 1; //handle this in main .ino  and reset back to 0 when done
+}
+
 bool JC3248W535EN::begin() {
+	//screenWasTouched = nextTouchScreenCheck = 0;
+	
     // Initialize display
     if (!gfx->begin()) return false;
     
@@ -39,24 +50,30 @@ bool JC3248W535EN::begin() {
         digitalWrite(GFX_BL, HIGH);
     }
     
-    // Initialize touch
+    // Initialize touch i2c
     Wire.begin(TOUCH_SDA, TOUCH_SCL);
     Wire.setClock(TOUCH_I2C_CLOCK);
     
     // Configure touch pins
-    pinMode(TOUCH_INT_PIN, INPUT_PULLUP);
+	/*
     pinMode(TOUCH_RST_PIN, OUTPUT);
     digitalWrite(TOUCH_RST_PIN, LOW);
     delay(200);
     digitalWrite(TOUCH_RST_PIN, HIGH);
     delay(200);
-    
+    */
+	delay(400);	//do a dumb delay to match the previous delays
+	
+	//enable interrupt
+	pinMode(TOUCH_PIN_NUM_INT, INPUT_PULLUP);
+	attachInterrupt(digitalPinToInterrupt(TOUCH_PIN_NUM_INT), touchISR_Lib, FALLING);
+  
     gfx->fillScreen(0); // Clear screen
     return true;
 }
 
 uint16_t JC3248W535EN::mapX(uint16_t x, uint16_t y) {
-    return 320 - y;
+    return height - y;
 }
 
 uint16_t JC3248W535EN::mapY(uint16_t x, uint16_t y) {
@@ -87,34 +104,34 @@ void JC3248W535EN::setFont(const GFXfont* font) {
 
 // Drawing functions implementation
 void JC3248W535EN::drawFillRect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    int16_t px = 320 - (y + h);
+    int16_t px = height - (y + h);
     int16_t py = x;
     int16_t pw = h;
     int16_t ph = w;
     if (px < 0) px = 0;
     if (py < 0) py = 0;
-    if (px + pw > 320) pw = 320 - px;
-    if (py + ph > 480) ph = 480 - py;
+    if (px + pw > height) pw = height - px;
+    if (py + ph > width) ph = width - py;
     gfx->fillRect(px, py, pw, ph, currentColor);
 }
 // Drawing functions implementation
 void JC3248W535EN::drawFillRect2(int16_t x, int16_t y, int16_t w, int16_t h) {
-    int16_t px = 320 - (y + h);
+    int16_t px = height - (y + h);
     int16_t py = x;
     int16_t pw = h;
     int16_t ph = w;
     if (px < 0) px = 0;
     if (py < 0) py = 0;
-    if (px + pw > 320) pw = 320 - px;
-    if (py + ph > 480) ph = 480 - py;
+    if (px + pw > height) pw = height - px;
+    if (py + ph > width) ph = width - py;
     gfx->fillRect(px, py, pw, ph, currentColor);
 }
 
 void JC3248W535EN::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
     // Convert coordinates to match the screen orientation
-    int16_t px0 = 320 - y0;
+    int16_t px0 = height - y0;
     int16_t py0 = x0;
-    int16_t px1 = 320 - y1;
+    int16_t px1 = height - y1;
     int16_t py1 = x1;
     
     // Draw the line with the current color
@@ -122,36 +139,36 @@ void JC3248W535EN::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
 }
 
 void JC3248W535EN::drawRect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    int16_t px = 320 - (y + h);
+    int16_t px = height - (y + h);
     int16_t py = x;
     int16_t pw = h;
     int16_t ph = w;
     if (px < 0) px = 0;
     if (py < 0) py = 0;
-    if (px + pw > 320) pw = 320 - px;
-    if (py + ph > 480) ph = 480 - py;
+    if (px + pw > height) pw = height - px;
+    if (py + ph > width) ph = width - py;
     gfx->drawRect(px, py, pw, ph, currentColor);
 }
 
 void JC3248W535EN::drawFillCircle(int16_t x, int16_t y, int16_t radius) {
-    int16_t px = 320 - y;
+    int16_t px = height - y;
     int16_t py = x;
     gfx->fillCircle(px, py, radius, currentColor);
 }
 
 void JC3248W535EN::drawCircleOutline(int16_t x, int16_t y, int16_t radius) {
-    int16_t px = 320 - y;
+    int16_t px = height - y;
     int16_t py = x;
     gfx->drawCircle(px, py, radius, currentColor);
 }
 
 void JC3248W535EN::drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
     // Convert coordinates to match screen orientation
-    int16_t px0 = 320 - y0;
+    int16_t px0 = height - y0;
     int16_t py0 = x0;
-    int16_t px1 = 320 - y1;
+    int16_t px1 = height - y1;
     int16_t py1 = x1;
-    int16_t px2 = 320 - y2;
+    int16_t px2 = height - y2;
     int16_t py2 = x2;
     
     gfx->drawTriangle(px0, py0, px1, py1, px2, py2, currentColor);
@@ -159,44 +176,44 @@ void JC3248W535EN::drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, 
 
 void JC3248W535EN::drawFillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
     // Convert coordinates to match screen orientation
-    int16_t px0 = 320 - y0;
+    int16_t px0 = height - y0;
     int16_t py0 = x0;
-    int16_t px1 = 320 - y1;
+    int16_t px1 = height - y1;
     int16_t py1 = x1;
-    int16_t px2 = 320 - y2;
+    int16_t px2 = height - y2;
     int16_t py2 = x2;
     
     gfx->fillTriangle(px0, py0, px1, py1, px2, py2, currentColor);
 }
 
 void JC3248W535EN::drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t radius) {
-    int16_t px = 320 - (y + h);
+    int16_t px = height - (y + h);
     int16_t py = x;
     int16_t pw = h;
     int16_t ph = w;
     if (px < 0) px = 0;
     if (py < 0) py = 0;
-    if (px + pw > 320) pw = 320 - px;
-    if (py + ph > 480) ph = 480 - py;
+    if (px + pw > height) pw = height - px;
+    if (py + ph > width) ph = width - py;
     
     gfx->drawRoundRect(px, py, pw, ph, radius, currentColor);
 }
 
 void JC3248W535EN::drawFillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t radius) {
-    int16_t px = 320 - (y + h);
+    int16_t px = height - (y + h);
     int16_t py = x;
     int16_t pw = h;
     int16_t ph = w;
     if (px < 0) px = 0;
     if (py < 0) py = 0;
-    if (px + pw > 320) pw = 320 - px;
-    if (py + ph > 480) ph = 480 - py;
+    if (px + pw > height) pw = height - px;
+    if (py + ph > width) ph = width - py;
     
     gfx->fillRoundRect(px, py, pw, ph, radius, currentColor);
 }
 
 void JC3248W535EN::drawEllipse(int16_t x, int16_t y, int16_t rx, int16_t ry) {
-    int16_t px = 320 - y;
+    int16_t px = height - y;
     int16_t py = x;
     
     // Note: ellipses might need swapping rx and ry due to orientation change
@@ -204,7 +221,7 @@ void JC3248W535EN::drawEllipse(int16_t x, int16_t y, int16_t rx, int16_t ry) {
 }
 
 void JC3248W535EN::drawFillEllipse(int16_t x, int16_t y, int16_t rx, int16_t ry) {
-    int16_t px = 320 - y;
+    int16_t px = height - y;
     int16_t py = x;
     
     // Note: ellipses might need swapping rx and ry due to orientation change
@@ -221,6 +238,12 @@ void JC3248W535EN::prt(const String &text, int x, int y, uint8_t size) {
     gfx->setRotation(originalRotation);
 }
 
+void JC3248W535EN::clearTouchData(void){
+	//there is prob a much more elegant way but for now just read the i2c data
+	getTouchPoint(xT, yT);
+}
+
+//this may be compatible with the AXS15231B touchscreen?
 bool JC3248W535EN::getTouchPoint(uint16_t &x, uint16_t &y) {
     uint8_t data[AXS_MAX_TOUCH_NUMBER * 6 + 2] = {0};
     
@@ -235,7 +258,8 @@ bool JC3248W535EN::getTouchPoint(uint16_t &x, uint16_t &y) {
     Wire.beginTransmission(TOUCH_ADDR);
     Wire.write(read_cmd, 11);
     if (Wire.endTransmission() != 0) return false;
-    
+    delay(1);	//add a tiny delay before the read?
+	
     if (Wire.requestFrom(TOUCH_ADDR, sizeof(data)) != sizeof(data)) return false;
     
     for (int i = 0; i < sizeof(data); i++) {
@@ -249,10 +273,22 @@ bool JC3248W535EN::getTouchPoint(uint16_t &x, uint16_t &y) {
         if (rawX == 273 && rawY == 273) return false;
         if (rawX > 4000 || rawY > 4000) return false;
         
-        y = map(rawX, 0, 320, 320, 0);
-        x = rawY;
+        yT = y = map(rawX, 0, height, height, 0);	//appears to transpose the coordinate map so the top left corner is 0,0
+        xT = x = rawY;
         
-        return true;
+		//add dumb fudge factor for since the top left corner is 14,10 not 0,0 and bottom right is 461,308 not 480,320
+		#ifdef USE_TOUCHSCREEN_FUDGE_FACTOR
+			y = map(y, 10, 308, 0, height);	//try to fudge factor fix
+			x = map(x, 14, 461, 0, width);	//try to fudge factor fix
+		#endif
+		
+		//prob want to add a range check here to ensure the click is truly in bounds
+		if (x > width || y > height ){
+			return false;
+		}
+		else{
+			return true;
+		}
     }
     
     return false;
@@ -332,7 +368,7 @@ void JC3248W535EN::drawQRCode(const char* data, uint16_t x, uint16_t y, uint8_t 
 void JC3248W535EN::image(const uint16_t* bitmap, int16_t x, int16_t y, int16_t w, int16_t h) {
     // Transform coordinates to match screen orientation
     // The screen is rotated 90 degrees, so we need to convert from normal coordinates
-    int16_t px = 320 - (y + h);  // Start at the top-left after transformation
+    int16_t px = height - (y + h);  // Start at the top-left after transformation
     int16_t py = x;
 
     // Check bounds and clip if necessary
@@ -346,11 +382,11 @@ void JC3248W535EN::image(const uint16_t* bitmap, int16_t x, int16_t y, int16_t w
     int16_t pw = h;  // Width and height are swapped due to orientation
     int16_t ph = w;
     
-    if (px + pw > 320) {
-        pw = 320 - px;
+    if (px + pw > height) {
+        pw = height - px;
     }
-    if (py + ph > 480) {
-        ph = 480 - py;
+    if (py + ph > width) {
+        ph = width - py;
     }
     
     // We need to render each pixel individually as drawBitmap only accepts uint8_t* and our bitmap is uint16_t*
@@ -368,11 +404,11 @@ void JC3248W535EN::image(const uint16_t* bitmap, int16_t x, int16_t y, int16_t w
 // Modified getPixel function that just returns a default value without serial logging
 uint16_t JC3248W535EN::getPixel(int16_t x, int16_t y) {
     // Transform coordinates to match screen orientation
-    int16_t px = 320 - y;
+    int16_t px = height - y;
     int16_t py = x;
     
     // Check bounds
-    if (px < 0 || px >= 320 || py < 0 || py >= 480) {
+    if (px < 0 || px >= height || py < 0 || py >= width) {
         return 0; // Return black for out-of-bounds
     }
     
@@ -583,12 +619,12 @@ void JC3248W535EN::fetchJpeg(const char* url, int16_t x, int16_t y) {
                 int16_t drawY = y + mcuY + py;
                 
                 // Transform coordinates to match screen orientation
-                int16_t transformedX = 320 - drawY;
+                int16_t transformedX = height - drawY;
                 int16_t transformedY = drawX;
                 
                 // Draw the pixel if it's within screen bounds
-                if (transformedX >= 0 && transformedX < 320 && 
-                    transformedY >= 0 && transformedY < 480) {
+                if (transformedX >= 0 && transformedX < height && 
+                    transformedY >= 0 && transformedY < width) {
                     // Draw the pixel using the GFX library
                     gfx->drawPixel(transformedX, transformedY, pixelColor);
                 }
@@ -750,10 +786,10 @@ bool JC3248W535EN::loadImageFromUrl(const char* url, int16_t x, int16_t y) {
         int16_t drawY = y + mcuY + py;
         
         // Apply coordinate transformation for rotated display
-        int16_t tx = 320 - drawY;
+        int16_t tx = height - drawY;
         int16_t ty = drawX;
         
-        if (tx >= 0 && tx < 320 && ty >= 0 && ty < 480) {
+        if (tx >= 0 && tx < height && ty >= 0 && ty < width) {
           gfx->drawPixel(tx, ty, color);
         }
       }
