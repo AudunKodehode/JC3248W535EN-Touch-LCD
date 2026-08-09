@@ -726,12 +726,16 @@ bool JC3248W535EN::loadImageFromUrl(const char* url, int16_t x, int16_t y) {
   imgFile.close();
   http.end();
   
+  return loadImageFromSPIFFS("/temp.img", x, y);
+}
+
+bool JC3248W535EN::loadImageFromSPIFFS(const char* filename, int16_t x, int16_t y) {
   // Clear progress bar area
   setColor(0, 0, 0);
   drawFillRect(x, y, 100, 80);
   
   // Now decode and render the image - JPEG only for simplicity
-  imgFile = SPIFFS.open("/temp.img", FILE_READ);
+  File imgFile = SPIFFS.open(filename, FILE_READ);
   if (!imgFile) return false;
   
   size_t fileSize = imgFile.size();
