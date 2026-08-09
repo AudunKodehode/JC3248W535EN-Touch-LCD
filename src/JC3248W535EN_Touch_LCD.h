@@ -57,6 +57,7 @@ public:
     void fetchJpeg(const char* url, int16_t x, int16_t y);
     uint16_t getPixel(int16_t x, int16_t y); // New function to read a pixel color
     bool loadImageFromUrl(const char* url, int16_t x, int16_t y); // Integrated image loading method
+    bool loadImageFromSPIFFS(const char* filename, int16_t x, int16_t y);
     
     // QR code function
     void drawQRCode(const char* data, uint16_t x, uint16_t y, uint8_t moduleSize = 3,
